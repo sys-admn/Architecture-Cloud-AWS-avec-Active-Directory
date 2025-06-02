@@ -1,0 +1,2 @@
+# Ensure Git hooks are executable on checkout
+.git/hooks/* text eol=lf
