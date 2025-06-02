@@ -1,0 +1,53 @@
+# Example of how to use AWS Secrets Manager for sensitive values
+# This is an example file showing how to securely handle secrets
+
+provider "aws" {
+  region = var.region
+}
+
+# Example of retrieving secrets from AWS Secrets Manager
+data "aws_secretsmanager_secret" "ad_admin_password" {
+  name = "dev/ad/admin_password"
+}
+
+data "aws_secretsmanager_secret_version" "ad_admin_password" {
+  secret_id = data.aws_secretsmanager_secret.ad_admin_password.id
+}
+
+data "aws_secretsmanager_secret" "rds_password" {
+  name = "dev/rds/password"
+}
+
+data "aws_secretsmanager_secret_version" "rds_password" {
+  secret_id = data.aws_secretsmanager_secret.rds_password.id
+}
+
+locals {
+  # Parse the secret values
+  ad_admin_password = jsondecode(data.aws_secretsmanager_secret_version.ad_admin_password.secret_string)["password"]
+  rds_password = jsondecode(data.aws_secretsmanager_secret_version.rds_password.secret_string)["password"]
+}
+
+# Use the secrets in your module calls
+module "windows_ad_infrastructure" {
+  source = "../../"
+  
+  # Pass all your regular variables
+  environment = var.environment
+  region = var.region
+  vpc_cidr_block = var.vpc_cidr_block
+  # ... other non-sensitive variables ...
+  
+  # Pass the secrets retrieved from Secrets Manager
+  admin_password = local.ad_admin_password
+  rds_password = local.rds_password
+}
+
+# Alternative approach using AWS Parameter Store
+data "aws_ssm_parameter" "ad_admin_password_ssm" {
+  name = "/dev/ad/admin_password"
+  with_decryption = true
+}
+
+# Then use it like:
+# admin_password = data.aws_ssm_parameter.ad_admin_password_ssm.value

@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+# Pre-commit hook to check for secrets before committing to Git
+# Place this file in .git/hooks/pre-commit and make it executable
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+echo "${YELLOW}Running pre-commit hook to check for secrets...${NC}"
+
+# Patterns to search for
+PATTERNS=(
+    # AWS Access Keys
+    "AKIA[0-9A-Z]{16}"
+    # AWS Secret Keys
+    "[0-9a-zA-Z/+]{40}"
+    # Generic API keys and tokens
+    "api[_-]?key[^a-zA-Z0-9]"
+    "token[^a-zA-Z0-9]"
+    "secret[^a-zA-Z0-9]"
+    # Password patterns
+    "password[^a-zA-Z0-9]"
+    "passwd[^a-zA-Z0-9]"
+    # Private keys
+    "-----BEGIN.*PRIVATE KEY"
+    # Common password variable names with values
+    "password.*=.*['\"].*['\"]"
+    "passwd.*=.*['\"].*['\"]"
+    "pwd.*=.*['\"].*['\"]"
+    # Terraform specific
+    "access_key.*=.*['\"].*['\"]"
+    "secret_key.*=.*['\"].*['\"]"
+)
+
+# Files to check (staged files only)
+FILES=$(git diff --cached --name-only)
+
+# Flag to track if any secrets were found
+SECRETS_FOUND=0
+
+# Check each staged file
+for FILE in $FILES; do
+    # Skip binary files and files that don't exist
+    if [[ ! -f "$FILE" ]] || [[ -z $(grep -I '' "$FILE") ]]; then
+        continue
+    fi
+    
+    # Skip files in .terraform directory
+    if [[ "$FILE" == *".terraform/"* ]]; then
+        continue
+    fi
+    
+    # Check for each pattern
+    for PATTERN in "${PATTERNS[@]}"; do
+        MATCHES=$(grep -l "$PATTERN" "$FILE" || true)
+        if [[ -n "$MATCHES" ]]; then
+            if [[ $SECRETS_FOUND -eq 0 ]]; then
+                echo "${RED}Potential secrets found in the following files:${NC}"
+                SECRETS_FOUND=1
+            fi
+            echo "${RED}  - $FILE (matched pattern: $PATTERN)${NC}"
+            # Show the matching lines (limited to first 3)
+            grep -n --color=always "$PATTERN" "$FILE" | head -3
+            echo ""
+        fi
+    done
+done
+
+# Special check for .tfvars files that might be committed despite .gitignore
+TFVARS_FILES=$(git diff --cached --name-only | grep '\.tfvars$' || true)
+if [[ -n "$TFVARS_FILES" ]]; then
+    echo "${RED}Warning: You are attempting to commit .tfvars files which may contain secrets:${NC}"
+    echo "${RED}$TFVARS_FILES${NC}"
+    echo "${YELLOW}These files are typically ignored in .gitignore because they may contain sensitive data.${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Check for private key files
+KEY_FILES=$(git diff --cached --name-only | grep -E '\.(pem|key|ppk)$' || true)
+if [[ -n "$KEY_FILES" ]]; then
+    echo "${RED}Warning: You are attempting to commit private key files:${NC}"
+    echo "${RED}$KEY_FILES${NC}"
+    SECRETS_FOUND=1
+fi
+
+# If secrets were found, abort the commit
+if [[ $SECRETS_FOUND -eq 1 ]]; then
+    echo "${RED}Error: Potential secrets found in your commit.${NC}"
+    echo "${YELLOW}Please remove the secrets or add the files to .gitignore before committing.${NC}"
+    echo "${YELLOW}If you're sure these aren't actual secrets, you can bypass this check with:${NC}"
+    echo "${YELLOW}  git commit --no-verify${NC}"
+    exit 1
+else
+    echo "${GREEN}No secrets found. Proceeding with commit.${NC}"
+fi
+
+exit 0

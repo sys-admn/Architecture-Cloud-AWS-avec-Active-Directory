@@ -1,0 +1,169 @@
+# Example terraform.tfvars file with placeholder values
+# Copy this file to terraform.tfvars and replace with actual values
+
+# Environment
+environment = "dev"
+
+# AWS Region
+region = "us-east-1"
+
+# VPC Configuration
+vpc_cidr_block = "10.0.0.0/16"
+vpc_name = "windows-ad-vpc-dev"
+availability_zones = ["us-east-1a", "us-east-1b"]
+public_subnet_count = 2
+private_subnet_count = 2
+create_nat_gateway = true
+enable_flow_logs = true
+flow_log_retention_days = 30
+create_s3_endpoint = true
+
+# Managed AD Configuration
+domain_name = "dev.corp.example.com"
+short_name = "DEVCORP"
+admin_password = "<REPLACE_WITH_SECURE_PASSWORD>" # Store in AWS Secrets Manager or use environment variables
+ad_edition = "Standard"
+enable_ad_logs = true
+ad_log_retention_days = 30
+
+# FSx Configuration
+fsx_name = "dev-corp-file-share"
+fsx_storage_capacity = 100
+fsx_deployment_type = "SINGLE_AZ_1"
+fsx_throughput_capacity = 32
+fsx_storage_type = "SSD"
+fsx_backup_retention_days = 7
+fsx_copy_tags_to_backups = true
+fsx_daily_backup_time = "02:00"
+
+# EC2 Instances
+instances = {
+  "windows-server-dev" = {
+    ami                         = "ami-0c765d44cf1f25d26" # Windows Server 2019
+    type                        = "t3.medium"
+    associate_public_ip_address = false
+    key_name                    = "windows-key-dev"
+    create_eip                  = false
+    root_volume_size            = 50
+    root_volume_type            = "gp3"
+    tags                        = {
+      Role = "Domain Member"
+      Name = "Windows Server Dev"
+    }
+  },
+  "bastion" = {
+    ami                         = "ami-0c765d44cf1f25d26" # Windows Server 2019
+    type                        = "t3.medium"
+    associate_public_ip_address = true
+    key_name                    = "windows-key-dev"
+    create_eip                  = true
+    eip_name                    = "Bastion-EIP-Dev"
+    root_volume_size            = 50
+    root_volume_type            = "gp3"
+    tags                        = {
+      Role = "Windows Bastion Host"
+      Name = "Windows Bastion Host Dev"
+    }
+  }
+}
+
+# IAM Configuration
+ec2_role_name = "windows-ec2-role-dev"
+ec2_instance_profile_name = "windows-ec2-profile-dev"
+policy_arns = [
+  "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+  "arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess"
+]
+create_custom_policy = false
+
+# Security Group Names
+ad_security_group_name = "ad-security-group-dev"
+fsx_security_group_name = "fsx-security-group-dev"
+ec2_security_group_name = "ec2-security-group-dev"
+route53_security_group_name = "route53-security-group-dev"
+rds_security_group_name = "rds-security-group-dev"
+
+# Route53 Configuration
+route53_endpoint_name = "ad-dns-outbound-dev"
+route53_resolver_rule_name = "ad-dns-forward-dev"
+create_resolver_rule = true
+
+# RDS Configuration - Basic Settings
+rds_ad_auth_role_name = "rds-ad-auth-role-dev"
+rds_identifier = "sqlserver-db-dev"
+rds_subnet_group_name = "sqlserver-subnet-group-dev"
+rds_parameter_group_name = "sqlserver-param-group-dev"
+rds_option_group_name = "sqlserver-option-group-dev"
+
+rds_engine = "sqlserver-se"
+rds_engine_version = "15.00.4236.7.v1"
+rds_major_engine_version = "15.00"
+rds_instance_class = "db.m5.large"
+
+rds_allocated_storage = 100
+rds_max_allocated_storage = 1000
+rds_storage_type = "gp3"
+rds_storage_encrypted = true
+
+rds_username = "admin"
+rds_password = "<REPLACE_WITH_SECURE_PASSWORD>" # Store in AWS Secrets Manager or use environment variables
+
+rds_multi_az = false
+rds_backup_retention_period = 7
+rds_backup_window = "03:00-06:00"
+rds_maintenance_window = "Mon:00:00-Mon:03:00"
+
+rds_skip_final_snapshot = true
+rds_deletion_protection = false
+rds_license_model = "license-included"
+
+# RDS Enhanced Features
+rds_enable_enhanced_monitoring = true
+rds_monitoring_role_name = "rds-monitoring-role-dev"
+rds_monitoring_interval = 60  # 60 seconds
+
+rds_enable_performance_insights = true
+rds_performance_insights_retention_period = 7  # 7 days
+
+# RDS CloudWatch Logs Export
+rds_enabled_cloudwatch_logs_exports = ["error", "agent"]
+rds_cloudwatch_logs_retention_days = 30
+
+# SQL Server specific log settings
+rds_enable_audit_log = false
+rds_enable_error_log = true
+rds_enable_agent_log = true
+
+# RDS S3 Integration
+rds_backup_bucket_name = "rds-sql-server-backups-dev-unique" # Add a unique suffix
+rds_enable_s3_import = false # S3 import not supported for SQL Server
+rds_s3_import_configuration = {
+  source_engine         = "sqlserver"
+  source_engine_version = "15.00"
+}
+
+# RDS Additional Settings
+rds_auto_minor_version_upgrade = true
+rds_apply_immediately = true
+rds_copy_tags_to_snapshot = true
+
+# Enable VPC endpoint for RDS to access it via private network
+create_rds_vpc_endpoint = true
+
+# SQL Server specific options
+rds_parameters = [
+  {
+    name  = "contained database authentication"
+    value = "1"
+  }
+]
+
+rds_options = []  # SQLSERVER_BACKUP_RESTORE option will be added in main.tf
+
+# Global Tags
+tags = {
+  Environment = "Development"
+  Project     = "Windows-AD-Infrastructure"
+  ManagedBy   = "Terraform"
+  Owner       = "IT-Infrastructure"
+}
